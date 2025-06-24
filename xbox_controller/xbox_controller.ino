@@ -29,7 +29,7 @@ ControllerPtr myControllers[BP32_MAX_CONTROLLERS];
 #define st3_90 [3000, 1990, 980] //POV from the Left of the arm : forward to backward
 #define st4_90 [2950, 2075, 1080] //POV from the Left of the arm : down to up (limited down to match still position)
 #define st5_90 [175, 1215, 2225, 3265] //POV from front : clockwise rotation
-#define st4_90 [1560, 1650, 1850, 2750] //Totally closed, parallel closed, Johnny Cash plectre closed, 90° open
+#define st6_90 [1560, 1650, 1850, 2750] //Totally closed, parallel closed, Johnny Cash plectre closed, 90° open
 
 //---------------------------- SERVO -------------------------
 void end()
@@ -52,6 +52,23 @@ void end()
 
   st.RegWritePosEx(4, 2900, 400, 50);
   st.RegWritePosEx(6, 1600, 400, 50);
+  st.RegWriteAction();
+  delay(3000);
+}
+
+void start()
+{
+  st.RegWritePosEx(1, 1530, 200, 50);
+  st.RegWritePosEx(2, 2070, 400, 30);
+  st.RegWritePosEx(3, 1990, 400, 50);
+
+  st.RegWriteAction();
+  delay(3000);
+
+  st.RegWritePosEx(4, 2075, 200, 50);
+  st.RegWritePosEx(5, 1215, 400, 50);
+  st.RegWritePosEx(6, 1600, 400, 50);
+
   st.RegWriteAction();
   delay(3000);
 }
@@ -194,18 +211,6 @@ bool positionState = false;  // false = position A, true = position B
 void loop() {
   unsigned long currentMillis = millis();
 
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-
-    if (positionState) {
-      st.WritePosEx(1, 1000, 500);  // Move Servo 1 to position A
-    } else {
-      st.WritePosEx(1, 2000, 500);  // Move Servo 1 to position B
-    }
-
-    positionState = !positionState;  // Toggle position
-  }
-
   // Keep Bluepad32 alive, optional
   BP32.update();
 
@@ -214,6 +219,10 @@ void loop() {
 
     if (myController && myController->isConnected()) {
       processGamepad(myController);
+      start();
+    }
+    else{
+      end();
     }
   }
 }
