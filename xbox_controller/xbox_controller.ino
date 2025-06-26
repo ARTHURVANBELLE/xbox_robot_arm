@@ -17,19 +17,30 @@ ControllerPtr myControllers[BP32_MAX_CONTROLLERS];
 #define S_RXD 18
 #define S_TXD 19
 
-#define st1_max [450, 2800]
-#define st2_max [1000, 3100]
-#define st3_max [900, 3000]
-#define st4_max [950, 3150]
-#define st5_max [200, 4095]
-#define st6_max [1560, 2750]
+// Maximum steps for each servo
+const int st1_max[] = {450, 2800};
+const int st2_max[] = {1000, 3100};
+const int st3_max[] = {900, 3000};
+const int st4_max[] = {950, 3150};
+const int st5_max[] = {200, 4095};
+const int st6_max[] = {1560, 2750};
 
-#define st1_90 [495, 1530, 2580] //POV from behind the arm : Left to Right
-#define st2_90 [3130, 2070, 1080] //POV from the Left of the arm : forward to backward
-#define st3_90 [3000, 1990, 980] //POV from the Left of the arm : forward to backward
-#define st4_90 [2950, 2075, 1080] //POV from the Left of the arm : down to up (limited down to match still position)
-#define st5_90 [175, 1215, 2225, 3265] //POV from front : clockwise rotation
-#define st6_90 [1560, 1650, 1850, 2750] //Totally closed, parallel closed, Johnny Cash plectre closed, 90° open
+// Step positions for 90° positions
+// Comments preserved for clarity
+const int st1_90[] = {495, 1530, 2580}; // POV from behind the arm: Left to Right
+const int st2_90[] = {3130, 2070, 1080}; // POV from the Left of the arm: forward to backward
+const int st3_90[] = {3000, 1990, 980}; // POV from the Left of the arm: forward to backward
+const int st4_90[] = {2950, 2075, 1080}; // POV from the Left of the arm: down to up (limited down to match still position)
+const int st5_90[] = {175, 1215, 2225, 3265}; // POV from front: clockwise rotation
+const int st6_90[] = {1560, 1650, 1850, 2750}; // Totally closed, parallel closed, Johnny Cash plectre closed, 90° open
+
+
+enum states{
+  INIT = 0,
+  CONNECTED = 1,
+  DISCONNECTED = 2,
+  END = 3,
+};
 
 //---------------------------- SERVO -------------------------
 void end()
@@ -81,6 +92,14 @@ void readAll()
     Serial.println(st.ReadPos(i));
   }
   Serial.println("----------------------");
+}
+
+void holdAll()
+{
+    for(int i = 1; i < 7; i++)
+  {
+    st.EnableTorque(i, 1);
+  }
 }
 
 
@@ -177,6 +196,41 @@ void processGamepad(ControllerPtr gamepad) {
   Serial.println(buf);
 }
 
+void rotate1(ControllerPtr gamepad)
+{
+  //turn left
+  if (gamepad->axisRX() < -50){
+    st.RegWritePosEx(1, st1_max[0], 300, 50);
+  }
+  //turn right
+  else if (gamepad->axisRX() > 50){
+    st.RegWritePosEx(1, st1_max[1], 300, 50);
+  }
+  //stop
+  else {
+    int currentPos = st.ReadPos(1);
+    st.RegWritePosEx(1, currentPos, 200, 50);
+  }
+  st.RegWriteAction();
+}
+
+void rotate6(ControllerPtr gamepad)
+{
+  //turn left
+  if (gamepad->throttle() > 50){
+    st.RegWritePosEx(6, st6_max[0], 300, 50);
+  }
+  //turn right
+  else if (gamepad->brake() > 50){
+    st.RegWritePosEx(6, st6_max[1], 300, 50);
+  }
+  //stop
+  else {
+    int currentPos = st.ReadPos(6);
+    st.RegWritePosEx(6, currentPos, 200, 50);
+  }
+  st.RegWriteAction();
+}
 
 void setup()
 {
@@ -210,19 +264,20 @@ bool positionState = false;  // false = position A, true = position B
 
 void loop() {
   unsigned long currentMillis = millis();
-
   // Keep Bluepad32 alive, optional
   BP32.update();
+
 
   for (int i = 0; i < BP32_MAX_CONTROLLERS; i++) {
     ControllerPtr myController = myControllers[i];
 
     if (myController && myController->isConnected()) {
       processGamepad(myController);
-      start();
+      rotate1(myController);
+      rotate6(myController);
     }
     else{
-      end();
+      holdAll();
     }
   }
 }
