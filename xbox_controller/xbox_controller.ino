@@ -11,6 +11,12 @@ please change the appropriate position, speed and delay parameters.
 SMS_STS st;
 ControllerPtr myControllers[BP32_MAX_CONTROLLERS];
 
+u8 servoIDs[] = {1, 2, 3, 4, 5, 6};
+s16 targetPos[] = {1530, 2070, 1990, 2075, 1215, 1600};
+u16 speeds[]    = {300, 300, 300, 300, 300, 300};
+u8 accels[]    = {50, 50, 50, 50, 50, 50};
+bool active[]   = {false, false, false, false, false, false};
+
 
 // the UART used to control servos.
 // GPIO 18 - S_RXD, GPIO 19 - S_TXD, as default.
@@ -84,6 +90,14 @@ void start()
   delay(3000);
 }
 
+void setPositionAsIs()
+{
+  for(int i = 0; i < 6; i++)
+  {
+    targetPos[i] = st.ReadPos(servoIDs[i]);
+  }
+}
+
 void readAll()
 {
   for(int i = 1; i < 7; i++)
@@ -101,7 +115,6 @@ void holdAll()
     st.EnableTorque(i, 1);
   }
 }
-
 
 void releaseAll()
 {
@@ -164,73 +177,144 @@ void onDisconnectedController(ControllerPtr ctl) {
   }
 }
 
-void processGamepad(ControllerPtr gamepad) {
-  // Another way to query the buttons, is by calling buttons(), or
-  // miscButtons() which return a bitmask.
-  // Some gamepads also have DPAD, axis and more.
-  char buf[256];
-  snprintf(buf, sizeof(buf) - 1,
-           "idx=%d, dpad: 0x%02x, buttons: 0x%04x, "
-           "axis L: %4li, %4li, axis R: %4li, %4li, "
-           "brake: %4ld, throttle: %4li, misc: 0x%02x, "
-           "gyro x:%6d y:%6d z:%6d, accel x:%6d y:%6d z:%6d, "
-           "battery: %d",
-           gamepad->index(),        // Gamepad Index
-           gamepad->dpad(),         // DPad
-           gamepad->buttons(),      // bitmask of pressed buttons
-           gamepad->axisX(),        // (-511 - 512) left X Axis
-           gamepad->axisY(),        // (-511 - 512) left Y axis
-           gamepad->axisRX(),       // (-511 - 512) right X axis
-           gamepad->axisRY(),       // (-511 - 512) right Y axis
-           gamepad->brake(),        // (0 - 1023): brake button
-           gamepad->throttle(),     // (0 - 1023): throttle (AKA gas) button
-           gamepad->miscButtons(),  // bitmask of pressed "misc" buttons
-           gamepad->gyroX(),        // Gyro X
-           gamepad->gyroY(),        // Gyro Y
-           gamepad->gyroZ(),        // Gyro Z
-           gamepad->accelX(),       // Accelerometer X
-           gamepad->accelY(),       // Accelerometer Y
-           gamepad->accelZ(),       // Accelerometer Z
-           gamepad->battery()       // 0=Unknown, 1=empty, 255=full
-  );
-  Serial.println(buf);
-}
+//ROTATION ---------------------------------
 
 void rotate1(ControllerPtr gamepad)
 {
-  //turn left
-  if (gamepad->axisRX() < -50){
-    st.RegWritePosEx(1, st1_max[0], 300, 50);
-  }
-  //turn right
-  else if (gamepad->axisRX() > 50){
-    st.RegWritePosEx(1, st1_max[1], 300, 50);
-  }
-  //stop
-  else {
-    int currentPos = st.ReadPos(1);
-    st.RegWritePosEx(1, currentPos, 200, 50);
-  }
-  st.RegWriteAction();
+    int idx = 0;  // Index for servo 1 in arrays
+    int currentPos = st.ReadPos(servoIDs[idx]);
+
+    if (gamepad->axisRX() < -100) {
+        targetPos[idx] = max(currentPos - 10, st1_max[0]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else if (gamepad->axisRX() > 100) {
+        targetPos[idx] = min(currentPos + 10, st1_max[1]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else {
+        active[idx] = false;
+    }
+}
+
+void rotate2(ControllerPtr gamepad)
+{
+    int idx = 1;  // Servo 2
+    int currentPos = st.ReadPos(servoIDs[idx]);
+
+    if (gamepad->throttle() > 50) {
+        targetPos[idx] = max(currentPos - 50, st2_max[0]);
+        speeds[idx] = 300;
+        accels[idx] = 255;
+        active[idx] = true;
+    }
+    else if (gamepad->brake() > 50) {
+        targetPos[idx] = min(currentPos + 50, st2_max[1]);
+        speeds[idx] = 300;
+        accels[idx] = 255;
+        active[idx] = true;
+    }
+    else {
+        active[idx] = false;
+    }
+}
+
+void rotate3(ControllerPtr gamepad)
+{
+    int idx = 2;
+    int currentPos = st.ReadPos(servoIDs[idx]);
+
+    if (gamepad->axisRY() > 100) {
+        targetPos[idx] = max(currentPos - 50, st3_max[0]);
+        speeds[idx] = 300;
+        accels[idx] = 255;
+        active[idx] = true;
+    }
+    else if (gamepad->axisRY() < -100) {
+        targetPos[idx] = min(currentPos + 50, st3_max[1]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else {
+        active[idx] = false;
+    }
+}
+
+void rotate4(ControllerPtr gamepad)
+{
+    int idx = 3;
+    int currentPos = st.ReadPos(servoIDs[idx]);
+
+    if (gamepad->axisY() > 100) {
+        targetPos[idx] = max(currentPos - 50, st4_max[0]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else if (gamepad->axisY() < -100) {
+        targetPos[idx] = min(currentPos + 50, st4_max[1]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else {
+        active[idx] = false;
+    }
+}
+
+void rotate5(ControllerPtr gamepad)
+{
+    int idx = 4;
+    uint16_t buttons = gamepad->buttons();
+    uint8_t group = (buttons >> 5) & 0x07;
+    int currentPos = st.ReadPos(servoIDs[idx]);
+
+
+    if (group == 1) {
+        targetPos[idx] = max(currentPos + 25, st5_max[0]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else if (buttons & (1 << 4)) {
+        targetPos[idx] = min(currentPos - 25, st5_max[1]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else {
+        active[idx] = false;
+    }
 }
 
 void rotate6(ControllerPtr gamepad)
 {
-  //turn left
-  if (gamepad->throttle() > 50){
-    st.RegWritePosEx(6, st6_max[0], 300, 50);
-  }
-  //turn right
-  else if (gamepad->brake() > 50){
-    st.RegWritePosEx(6, st6_max[1], 300, 50);
-  }
-  //stop
-  else {
-    int currentPos = st.ReadPos(6);
-    st.RegWritePosEx(6, currentPos, 200, 50);
-  }
-  st.RegWriteAction();
+    int idx = 5;
+    uint16_t buttons = gamepad->buttons();
+    int currentPos = st.ReadPos(servoIDs[idx]);
+
+    if (buttons & 0x0001) {
+        targetPos[idx] = max(currentPos - 25, st6_max[0]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else if (buttons & 0x0002) {
+        targetPos[idx] = min(currentPos + 25, st6_max[1]);
+        speeds[idx] = 300;
+        accels[idx] = 50;
+        active[idx] = true;
+    }
+    else {
+        active[idx] = false;
+    }
 }
+
 
 void setup()
 {
@@ -238,6 +322,8 @@ void setup()
   Serial1.begin(1000000, SERIAL_8N1, S_RXD, S_TXD);
   st.pSerial = &Serial1;
   delay(1000);
+
+  setPositionAsIs();
 
   String fv = BP32.firmwareVersion();
   Serial.print("Firmware version installed: ");
@@ -258,26 +344,25 @@ void setup()
   BP32.setup(&onConnectedController, &onDisconnectedController);
 }
 
-unsigned long previousMillis = 0;
-const long interval = 3000;  // Time between movements
-bool positionState = false;  // false = position A, true = position B
-
 void loop() {
-  unsigned long currentMillis = millis();
   // Keep Bluepad32 alive, optional
   BP32.update();
 
+  ControllerPtr myController = myControllers[0];
 
-  for (int i = 0; i < BP32_MAX_CONTROLLERS; i++) {
-    ControllerPtr myController = myControllers[i];
+  if (myController && myController->isConnected()) {
+    rotate1(myController);
+    rotate2(myController);
+    rotate3(myController);
+    rotate4(myController);
+    rotate5(myController);
+    rotate6(myController);
 
-    if (myController && myController->isConnected()) {
-      processGamepad(myController);
-      rotate1(myController);
-      rotate6(myController);
-    }
-    else{
-      holdAll();
-    }
+    st.SyncWritePosEx(servoIDs, sizeof(active), targetPos, speeds, accels);
+
+    st.RegWriteAction();
+  }
+  else{
+    holdAll();
   }
 }
